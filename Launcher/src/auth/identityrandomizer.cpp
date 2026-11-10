@@ -50,7 +50,12 @@ const QStringList kGpuStrings = {
 
 // iovation client id: 27 random printable ASCII characters, base64, lower case
 // (mirrors Fingerprint::generateUuid()).
-QString randomUuid()
+// 100 random printable ASCII characters + ' ' + epoch milliseconds, base64
+// (mirrors Fingerprint::generateVector()).
+
+} // namespace
+
+QString IdentityRandomizer::randomUuid()
 {
     QByteArray chars;
     for (int i = 0; i < 27; ++i)
@@ -58,9 +63,7 @@ QString randomUuid()
     return QString::fromLatin1(chars.toBase64().toLower());
 }
 
-// 100 random printable ASCII characters + ' ' + epoch milliseconds, base64
-// (mirrors Fingerprint::generateVector()).
-QString randomVector()
+QString IdentityRandomizer::randomVector()
 {
     QByteArray chars;
     for (int i = 0; i < 100; ++i)
@@ -70,7 +73,6 @@ QString randomVector()
     return QString::fromLatin1(chars.toBase64());
 }
 
-} // namespace
 
 QJsonObject IdentityRandomizer::randomize(const QJsonObject& identity)
 {
