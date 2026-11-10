@@ -1,0 +1,46 @@
+name: Build Windows launcher
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtwebengine'
+          cache: true
+
+      - name: Build launcher
+        shell: cmd
+        run: |
+          cd Launcher
+          qmake GflessClient.pro
+          nmake release
+
+      - name: Deploy Qt runtime
+        shell: cmd
+        run: |
+          cd Launcher\bin
+          windeployqt --release --no-translations --compiler-runtime GflessClient.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GflessClient-win64-unique-identity
+          path: Launcher/bin/
+          if-no-files-found: error
