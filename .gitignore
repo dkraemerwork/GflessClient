@@ -445,3 +445,6 @@ FodyWeavers.xsd
 Launcher/build
 CertExtractor/build
 Installer/*.exe
+# local build outputs
+dist/
+*.zip
