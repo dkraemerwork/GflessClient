@@ -1,0 +1,74 @@
+name: Build Windows launcher
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+
+      - name: Build launcher
+        shell: cmd
+        run: |
+          cd Launcher
+          qmake GflessClient.pro
+          nmake release
+
+      - name: Deploy Qt runtime
+        shell: cmd
+        run: |
+          cd Launcher\bin
+          windeployqt --release --no-translations --compiler-runtime GflessClient.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GflessClient-win64-unique-identity
+          path: Launcher/bin/
+          if-no-files-found: error
+
+  # Rolling release: every green build on unique-identity republishes the exe
+  # to one stable link, so no manual release step is ever needed.
+  release:
+    needs: build
+    if: github.ref_name == 'unique-identity'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: rolling-release
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: GflessClient-win64-unique-identity
+          path: dist/
+
+      - name: Publish rolling release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete v1.2.0-unique-identity --cleanup-tag -y 2>$null
+          gh release create v1.2.0-unique-identity dist/GflessClient.exe --title "v1.2.0 unique-identity (latest)" --notes "Rolling build from the unique-identity branch. Overwrite GflessClient.exe in your install folder (run as admin)."

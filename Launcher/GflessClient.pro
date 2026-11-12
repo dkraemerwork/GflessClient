@@ -1,4 +1,4 @@
-!versionAtLeast(QT_VERSION, 6.11.0): error("Gfless Client requires Qt 6.11 or newer")
+!versionAtLeast(QT_VERSION, 6.10.0): error("Gfless Client requires Qt 6.10 or newer")
 
 QT       += core gui network webenginecore webchannel widgets
 
