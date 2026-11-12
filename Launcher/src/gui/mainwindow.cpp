@@ -1105,7 +1105,7 @@ void MainWindow::openAccount(const Profile *profile, QQueue<int> accountIndexes)
             // Don't launch the next client until this one has collected its
             // one-time code: with slow (Wine) startups the next launch would
             // otherwise overwrite the code slot while it is still needed.
-            waitForAuthHandshake(profile, accountIndexes, sessionId, QDateTime::currentDateTime());
+            waitForAuthHandshake(profile, accountIndexes, sessionId, openInterval, QDateTime::currentDateTime());
             return;
         }
         else {
@@ -1118,7 +1118,7 @@ void MainWindow::openAccount(const Profile *profile, QQueue<int> accountIndexes)
     });
 }
 
-void MainWindow::waitForAuthHandshake(const Profile* profile, QQueue<int> accountIndexes, const QString& sessionId, const QDateTime& started)
+void MainWindow::waitForAuthHandshake(const Profile* profile, QQueue<int> accountIndexes, const QString& sessionId, int openInterval, const QDateTime& started)
 {
     if (gflessClient->isAuthDone(sessionId) || started.secsTo(QDateTime::currentDateTime()) > 120)
     {
@@ -1131,6 +1131,6 @@ void MainWindow::waitForAuthHandshake(const Profile* profile, QQueue<int> accoun
 
     ui->statusbar->showMessage("Waiting for the game to collect its login code...", 2000);
     QTimer::singleShot(2000, this, [=]() {
-        waitForAuthHandshake(profile, accountIndexes, sessionId, started);
+        waitForAuthHandshake(profile, accountIndexes, sessionId, openInterval, started);
     });
 }

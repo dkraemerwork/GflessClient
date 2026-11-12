@@ -131,7 +131,7 @@ private:
 
     void updateGame();
 
-    void waitForAuthHandshake(const Profile* profile, QQueue<int> accountIndexes, const QString& sessionId, const QDateTime& started);
+    void waitForAuthHandshake(const Profile* profile, QQueue<int> accountIndexes, const QString& sessionId, int openInterval, const QDateTime& started);
 
     QString resolveEgressIp(const GameforgeAccount* account);
 
