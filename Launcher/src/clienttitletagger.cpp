@@ -37,8 +37,11 @@ BOOL CALLBACK ClientTitleTagger::enumProc(HWND hwnd, LPARAM lParam)
         return TRUE;
     if (!IsWindowVisible(hwnd))
         return TRUE;
-    if (GetWindow(hwnd, GW_OWNER) != nullptr)
-        return TRUE; // owned dialogs, tooltips
+    // NOTE: no GW_OWNER filter on purpose. Classic Delphi (which NosTale is)
+    // owns the main form through a hidden Application window, so the real
+    // game window always has an owner. Tool windows are still skipped below.
+    if (GetWindowLongW(hwnd, GWL_EXSTYLE) & WS_EX_TOOLWINDOW)
+        return TRUE; // tooltips, dropdowns
 
     wchar_t title[256];
     if (GetWindowTextW(hwnd, title, 256) == 0)

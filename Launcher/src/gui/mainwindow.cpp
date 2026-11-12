@@ -1092,6 +1092,8 @@ void MainWindow::openAccount(const Profile *profile, QQueue<int> accountIndexes)
 
         if (gflessClient->openClient(gameAccount.getName(), token, customPath.isEmpty() ? gamePath : customPath, gameLang, pid)) {
             QString msg = "Launched game with PID " + QString::number(pid);
+            if (!egressIp.isEmpty())
+                msg += " [" + egressIp + "]";
             ui->statusbar->showMessage(msg, 10000);
             processAccounts.insert(pid, gameAccount);
 
