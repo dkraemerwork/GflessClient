@@ -18,6 +18,8 @@ bool GflessClient::openClient(const QString& displayName, const QString& token, 
     sessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     sessions.insert(sessionId, {token, displayName});
     sessionOrder.append(sessionId);
+    while (sessionOrder.size() > 50) // bounded; the game always self-identifies
+        sessions.remove(sessionOrder.takeFirst());
 
     int index = gameClientPath.lastIndexOf("/");
 
@@ -98,16 +100,10 @@ void GflessClient::handleNewConnection()
 {
     QLocalSocket* sock = gfServer->nextPendingConnection();
     connect(sock, &QLocalSocket::readyRead, this, [this, sock]() { handlePipe(sock); });
-    connect(sock, &QLocalSocket::disconnected, this, [this, sock]() {
-        const QString sid = sock->property("sessionId").toString();
-        if (!sid.isEmpty())
-        {
-            sessions.remove(sid);
-            sessionOrder.removeAll(sid);
-            authDone.remove(sid);
-        }
-        sock->deleteLater();
-    });
+    // NOTE: sessions are deliberately NOT removed here. The game opens and
+    // closes pipe connections during its handshake; wiping the code slot on
+    // disconnect is what starved later queries of their answer.
+    connect(sock, &QLocalSocket::disconnected, sock, &QLocalSocket::deleteLater);
 }
 
 void GflessClient::handlePipe(QLocalSocket* sock)
@@ -138,7 +134,6 @@ void GflessClient::handlePipe(QLocalSocket* sock)
         if (sid.isEmpty())
             return;
         output = prepareResponse(json, sessions[sid].displayName.toUtf8());
-        authDone.insert(sid);
     }
 
     else
@@ -168,24 +163,14 @@ QString GflessClient::sessionFor(QLocalSocket* sock, const QJsonObject& json)
     if (sessions.size() == 1)
         return sessions.firstKey();
 
-    // Several clients waiting: oldest one that hasn't collected its code.
+    // Several clients waiting: oldest one. (First choice is always the
+    // session id the game itself reports; this is only the fallback for
+    // messages without one.)
     for (const QString& key : sessionOrder)
-        if (sessions.contains(key) && !authDone.contains(key))
+        if (sessions.contains(key))
             return key;
 
     return QString();
-}
-
-bool GflessClient::isAuthDone(const QString& sessionId) const
-{
-    return authDone.contains(sessionId);
-}
-
-void GflessClient::dropSession(const QString& sessionId)
-{
-    sessions.remove(sessionId);
-    sessionOrder.removeAll(sessionId);
-    authDone.remove(sessionId);
 }
 
 QByteArray GflessClient::prepareResponse(const QJsonObject &request, const QString &response)

@@ -11,7 +11,6 @@
 #include <QSettings>
 #include <QTimer>
 #include <QMap>
-#include <QSet>
 #include <Windows.h>
 
 struct GfSession
@@ -30,12 +29,6 @@ public:
 
     bool openClientSettings(const QString& gameClientPath);
 
-    // True once this client's game has collected its auth code + display name
-    // (queryGameAccountName answered). MainWindow waits for this before
-    // launching the next client, so codes can't be handed to the wrong game.
-    bool isAuthDone(const QString& sessionId) const;
-    void dropSession(const QString& sessionId);
-
 private slots:
     void handleNewConnection();
 
@@ -46,9 +39,10 @@ private:
     QLocalServer* gfServer;
 
     // One entry per launched game client, keyed by its unique _TNT_SESSION_ID.
+    // Entries persist for the launcher session (a few dozen QStrings at most);
+    // the game always identifies itself, so stale entries are never consulted.
     QMap<QString, GfSession> sessions;
     QStringList sessionOrder;
-    QSet<QString> authDone;
 
     QByteArray prepareResponse(const QJsonObject& request, const QString& response);
 

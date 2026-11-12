@@ -10,7 +10,6 @@
 #include "otpdialog.h"
 #include "powcaptchasolver.h"
 #include "clienttitletagger.h"
-#include <QDateTime>
 #include <QQueue>
 #include "ui_mainwindow.h"
 #include <QEventLoop>
@@ -1170,12 +1169,6 @@ void MainWindow::openAccount(const Profile *profile, QQueue<int> accountIndexes)
 
             if (!egressIp.isEmpty())
                 new ClientTitleTagger(this, pid, egressIp);
-
-            // Don't launch the next client until this one has collected its
-            // one-time code: with slow (Wine) startups the next launch would
-            // otherwise overwrite the code slot while it is still needed.
-            waitForAuthHandshake(profile, accountIndexes, sessionId, openInterval, QDateTime::currentDateTime());
-            return;
         }
         else {
             ui->statusbar->showMessage("Failed to launch game for account " + gameAccount.getName(), 10000);
@@ -1184,22 +1177,5 @@ void MainWindow::openAccount(const Profile *profile, QQueue<int> accountIndexes)
 
     QTimer::singleShot(openInterval * 1000, this, [=]() {
         openAccount(profile, accountIndexes);
-    });
-}
-
-void MainWindow::waitForAuthHandshake(const Profile* profile, QQueue<int> accountIndexes, const QString& sessionId, int openInterval, const QDateTime& started)
-{
-    if (gflessClient->isAuthDone(sessionId) || started.secsTo(QDateTime::currentDateTime()) > 120)
-    {
-        gflessClient->dropSession(sessionId);
-        QTimer::singleShot(openInterval * 1000, this, [=]() {
-            openAccount(profile, accountIndexes);
-        });
-        return;
-    }
-
-    ui->statusbar->showMessage("Waiting for the game to collect its login code...", 2000);
-    QTimer::singleShot(2000, this, [=]() {
-        waitForAuthHandshake(profile, accountIndexes, sessionId, openInterval, started);
     });
 }
