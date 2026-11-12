@@ -28,7 +28,11 @@ BOOL CALLBACK ClientTitleTagger::enumProc(HWND hwnd, LPARAM lParam)
 {
     auto* ctx = reinterpret_cast<EnumContext*>(lParam);
 
-    if (GetWindowThreadProcessId(hwnd, nullptr) != ctx->pid)
+    // NOTE: GetWindowThreadProcessId returns the thread id; the process id
+    // comes back through the second parameter.
+    DWORD windowPid = 0;
+    GetWindowThreadProcessId(hwnd, &windowPid);
+    if (windowPid != ctx->pid)
         return TRUE;
     if (!IsWindowVisible(hwnd))
         return TRUE;
@@ -88,5 +92,8 @@ void ClientTitleTagger::poll()
 
     const QString wanted = title + suffix;
     if (SetWindowTextW(hwnd, reinterpret_cast<const wchar_t*>(wanted.utf16())))
+    {
         appliedSuffix = suffix;
+        qDebug() << "ClientTitleTagger: tagged window of pid" << pid << "as" << wanted;
+    }
 }
