@@ -1,5 +1,6 @@
 #include "clienttitletagger.h"
 
+#include <QDebug>
 #include <QTimer>
 
 namespace
