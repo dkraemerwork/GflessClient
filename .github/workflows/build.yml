@@ -44,3 +44,29 @@ jobs:
           name: GflessClient-win64-unique-identity
           path: Launcher/bin/
           if-no-files-found: error
+
+  # Rolling release: every green build on unique-identity republishes the exe
+  # to one stable link, so no manual release step is ever needed.
+  release:
+    needs: build
+    if: github.ref_name == 'unique-identity'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: rolling-release
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: GflessClient-win64-unique-identity
+          path: dist/
+
+      - name: Publish rolling release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete v1.2.0-unique-identity --cleanup-tag -y 2>$null
+          gh release create v1.2.0-unique-identity dist/GflessClient.exe --title "v1.2.0 unique-identity (latest)" --notes "Rolling build from the unique-identity branch. Overwrite GflessClient.exe in your install folder (run as admin)."
