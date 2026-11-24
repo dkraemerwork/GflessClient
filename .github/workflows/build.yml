@@ -6,6 +6,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  socks5:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test the SOCKS5 handshake
+        run: python -m unittest discover -s GflessDLL/tests -v
+
   dll:
     runs-on: windows-latest
 
@@ -18,10 +27,6 @@ jobs:
       - name: Build GflessDLL (Win32 Release)
         shell: cmd
         run: msbuild GflessDLL\GflessDLL.sln /p:Configuration=Release /p:Platform=x86 /v:minimal
-
-      - name: Test the SOCKS5 handshake
-        shell: cmd
-        run: python -m unittest discover -s GflessDLL/tests -v
 
       - name: Upload DLL
         uses: actions/upload-artifact@v4
@@ -79,7 +84,7 @@ jobs:
   # Rolling release: every green build on the working branch republishes the
   # exe and the DLL to one stable link, so no manual release step is needed.
   release:
-    needs: [build, dll]
+    needs: [build, dll, socks5]
     if: github.ref_name == 'ci/proxy-build'
     runs-on: windows-latest
     permissions:

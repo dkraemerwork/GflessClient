@@ -70,6 +70,35 @@ __declspec(naked) void redirectConnection() {
     }
 }
 
+// Kept out of connectProxy: a naked function may hold no object that would
+// need unwinding, which rules out std::string (C3068).
+static void tunnelConnection()
+{
+    TClientCore* clientCore = TClientCore::getInstance();
+    SOCKET proxySocket = clientCore != nullptr ? clientCore->getSocket() : INVALID_SOCKET;
+    std::string error;
+
+    if (proxySocket == INVALID_SOCKET)
+        error = "the client's socket could not be read";
+
+    else if (originalIp == nullptr)
+        error = "the original destination is unknown";
+
+    else
+        Socks5::openTunnel(proxySocket, proxyUsername, proxyPassword,
+            originalIp, static_cast<unsigned short>(originalPort), error);
+
+    if (error.empty())
+        return;
+
+    // The game is about to speak its own protocol to a tunnel that was never
+    // opened. Say so rather than let it fail as a timeout, and close the
+    // client: whatever it would reach now, it would reach from the real IP.
+    MessageBoxA(NULL, ("The connection could not be tunneled through the proxy: " + error
+        + ".\nThe game is being closed.").c_str(), "Gfless Client", MB_ICONERROR);
+    ExitProcess(EXIT_FAILURE);
+}
+
 __declspec(naked) void connectProxy() {
     __asm {
         // Call the original function first
@@ -79,40 +108,12 @@ __declspec(naked) void connectProxy() {
         pushad;
         pushfd;
 
-        // Epilogue for our code
+        // Prologue for our code
         push ebp
         mov ebp, esp
-        sub esp, __LOCAL_SIZE
-    }
 
-    {
-        TClientCore* clientCore = TClientCore::getInstance();
-        SOCKET proxySocket = clientCore != nullptr ? clientCore->getSocket() : INVALID_SOCKET;
-        std::string error;
+        call tunnelConnection
 
-        if (proxySocket == INVALID_SOCKET)
-            error = "the client's socket could not be read";
-
-        else if (originalIp == nullptr)
-            error = "the original destination is unknown";
-
-        else
-            Socks5::openTunnel(proxySocket, proxyUsername, proxyPassword,
-                originalIp, static_cast<unsigned short>(originalPort), error);
-
-        if (!error.empty())
-        {
-            // The game is about to speak its own protocol to a tunnel that was
-            // never opened. Say so rather than let it fail as a timeout, and
-            // close the client: whatever it would reach now, it would reach
-            // from the real IP.
-            MessageBoxA(NULL, ("The connection could not be tunneled through the proxy: " + error
-                + ".\nThe game is being closed.").c_str(), "Gfless Client", MB_ICONERROR);
-            ExitProcess(EXIT_FAILURE);
-        }
-    }
-
-    __asm {
         // Epilogue
         mov esp, ebp
         pop ebp
