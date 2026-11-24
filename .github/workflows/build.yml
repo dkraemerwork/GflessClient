@@ -112,4 +112,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete v1.2.0-proxy --cleanup-tag -y 2>$null
-          gh release create v1.2.0-proxy dist/GflessClient.exe dist-dll/GflessDLL.dll --title "v1.2.0 proxy (latest)" --notes "Rolling build with game-traffic proxying. Overwrite GflessClient.exe and GflessDLL.dll in your install folder (run as admin)."
+          $dll = (Get-ChildItem -Recurse -Filter GflessDLL.dll dist-dll).FullName
+          gh release create v1.2.0-proxy dist/GflessClient.exe $dll --title "v1.2.0 proxy (latest)" --notes "Rolling build with game-traffic proxying. Overwrite GflessClient.exe and GflessDLL.dll in your install folder (run as admin)."
