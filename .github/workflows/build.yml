@@ -17,13 +17,13 @@ jobs:
       # The game client is 32-bit, so the injected DLL has to be Win32.
       - name: Build GflessDLL (Win32 Release)
         shell: cmd
-        run: msbuild GflessDLL\GflessDLL.sln /p:Configuration=Release /p:Platform=Win32 /v:minimal
+        run: msbuild GflessDLL\GflessDLL.sln /p:Configuration=Release /p:Platform=x86 /v:minimal
 
       - name: Upload DLL
         uses: actions/upload-artifact@v4
         with:
           name: GflessDLL-win32
-          path: GflessDLL/Release/GflessDLL.dll
+          path: GflessDLL/**/GflessDLL.dll
           if-no-files-found: error
 
   build:
@@ -38,7 +38,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.10.3'
+          version: '6.11.1'
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
