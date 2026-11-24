@@ -1,0 +1,99 @@
+name: Build Windows launcher
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  dll:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: microsoft/setup-msbuild@v2
+
+      # The game client is 32-bit, so the injected DLL has to be Win32.
+      - name: Build GflessDLL (Win32 Release)
+        shell: cmd
+        run: msbuild GflessDLL\GflessDLL.sln /p:Configuration=Release /p:Platform=Win32 /v:minimal
+
+      - name: Upload DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: GflessDLL-win32
+          path: GflessDLL/Release/GflessDLL.dll
+          if-no-files-found: error
+
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtwebengine qtwebchannel qtpositioning'
+          cache: true
+
+      - name: Build launcher
+        shell: cmd
+        run: |
+          cd Launcher
+          qmake GflessClient.pro
+          nmake release
+
+      - name: Deploy Qt runtime
+        shell: cmd
+        run: |
+          cd Launcher\bin
+          windeployqt --release --no-translations --compiler-runtime GflessClient.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GflessClient-win64-unique-identity
+          path: Launcher/bin/
+          if-no-files-found: error
+
+  # Rolling release: every green build on the working branch republishes the
+  # exe and the DLL to one stable link, so no manual release step is needed.
+  release:
+    needs: [build, dll]
+    if: github.ref_name == 'ci/proxy-build'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: rolling-release
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: GflessClient-win64-unique-identity
+          path: dist/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: GflessDLL-win32
+          path: dist-dll/
+
+      - name: Publish rolling release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete v1.2.0-proxy --cleanup-tag -y 2>$null
+          gh release create v1.2.0-proxy dist/GflessClient.exe dist-dll/GflessDLL.dll --title "v1.2.0 proxy (latest)" --notes "Rolling build with game-traffic proxying. Overwrite GflessClient.exe and GflessDLL.dll in your install folder (run as admin)."
