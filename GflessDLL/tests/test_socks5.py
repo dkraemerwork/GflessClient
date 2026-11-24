@@ -260,10 +260,12 @@ class Socks5Test(unittest.TestCase):
             echo.close()
 
     def test_a_refused_destination_is_reported(self):
-        # Nothing listens on the port the echo server just released.
-        echo = EchoServer()
-        dead = echo.port
-        echo.close()
+        # A port nothing ever listened on: closing a live server's listener
+        # does not necessarily free its accept loop on every platform.
+        spare = socket.socket()
+        spare.bind(("127.0.0.1", 0))
+        dead = spare.getsockname()[1]
+        spare.close()
         proxy = Socks5Server(None)
         try:
             self.assertIn("refused the tunnel", self.run_driver(proxy.port, "127.0.0.1", dead))
