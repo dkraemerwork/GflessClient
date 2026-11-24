@@ -150,6 +150,7 @@
     <ClCompile Include="NosmallDisabler.cpp" />
     <ClCompile Include="PatternScanner.cpp" />
     <ClCompile Include="ProxyMod.cpp" />
+    <ClCompile Include="Socks5.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GameStructures\NostaleString.h" />
@@ -164,6 +165,7 @@
     <ClInclude Include="NosmallDisabler.h" />
     <ClInclude Include="PatternScanner.h" />
     <ClInclude Include="ProxyMod.h" />
+    <ClInclude Include="Socks5.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

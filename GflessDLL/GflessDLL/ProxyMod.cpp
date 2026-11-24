@@ -3,6 +3,7 @@
 #include "ProxyMod.h"
 #include "PatternScanner.h"
 #include "Hook.h"
+#include "Socks5.h"
 #include "GameStructures/NostaleString.h"
 #include "GameStructures/TClientCore.h"
 #include <iostream>
@@ -87,119 +88,30 @@ __declspec(naked) void connectProxy() {
     {
         TClientCore* clientCore = TClientCore::getInstance();
         SOCKET proxySocket = clientCore != nullptr ? clientCore->getSocket() : INVALID_SOCKET;
-        int authDetailsSize = 3 + proxyUsername.length() + proxyPassword.length();
-        char * authDetails = new char[authDetailsSize];
+        std::string error;
 
-        if (proxySocket == INVALID_SOCKET) {
-            MessageBoxA(NULL, "Could not read the client's socket: this connection was NOT tunneled through the proxy.", "Error", MB_ICONERROR);
-            delete[] authDetails;
-            goto END;
+        if (proxySocket == INVALID_SOCKET)
+            error = "the client's socket could not be read";
+
+        else if (originalIp == nullptr)
+            error = "the original destination is unknown";
+
+        else
+            Socks5::openTunnel(proxySocket, proxyUsername, proxyPassword,
+                originalIp, static_cast<unsigned short>(originalPort), error);
+
+        if (!error.empty())
+        {
+            // The game is about to speak its own protocol to a tunnel that was
+            // never opened. Say so rather than let it fail as a timeout, and
+            // close the client: whatever it would reach now, it would reach
+            // from the real IP.
+            MessageBoxA(NULL, ("The connection could not be tunneled through the proxy: " + error
+                + ".\nThe game is being closed.").c_str(), "Gfless Client", MB_ICONERROR);
+            ExitProcess(EXIT_FAILURE);
         }
-
-        // Send the SOCKS5 handshake
-        char socks5handshake[] = { 0x05, 0x01, 0x02 };
-
-        if (send(proxySocket, socks5handshake, 3, 0) == SOCKET_ERROR) {
-            MessageBoxA(NULL, "Failed to send SOCKS5 handhsake to the proxy server.", "Error", MB_ICONERROR);
-            delete[] authDetails;
-            goto END;
-        }
-
-        // Receive the SOCKS5 handhsake response
-        char responseBuffer[2];
-        int bytesRead = recv(proxySocket, responseBuffer, 2, 0);
-
-        if (bytesRead <= 0) {
-            MessageBoxA(NULL, "Failed to receive SOCKS5 handshake response from the proxy server.", "Error", MB_ICONERROR);
-            delete[] authDetails;
-            goto END;
-        }
-
-        // Check that the response is correct
-        if (responseBuffer[0] != 0x05 || responseBuffer[1] != 0x02) {
-            MessageBoxA(NULL, "Proxy server does not support SOCKS5 authentication.", "Error", MB_ICONERROR);
-            delete[] authDetails;
-            goto END;
-        }
-
-        if (!proxyUsername.empty()) {
-            // Send the SOCKS5 authentication details
-            authDetails[0] = 0x01; // Authentication version
-            authDetails[1] = static_cast<char>(proxyUsername.length()); // Username length
-            memcpy(&authDetails[2], proxyUsername.c_str(), proxyUsername.length()); // Username
-            authDetails[2 + authDetails[1]] = static_cast<char>(proxyPassword.length()); // Password length
-            memcpy(&authDetails[3 + authDetails[1]], proxyPassword.c_str(), proxyPassword.length()); // Password
-
-            if (send(proxySocket, authDetails, authDetailsSize, 0) == SOCKET_ERROR) {
-                MessageBoxA(NULL, "Failed to send SOCKS5 authentication details to the proxy server.", "Error", MB_ICONERROR);
-                delete[] authDetails;
-                goto END;
-            }
-
-            // Receive the SOCKS5 authentication response
-            char authResponse[2];
-            bytesRead = recv(proxySocket, authResponse, 2, 0);
-
-            if (bytesRead <= 0) {
-                MessageBoxA(NULL, "Failed to receive SOCKS5 authentication response.", "Error", MB_ICONERROR);
-                delete[] authDetails;
-                goto END;
-            }
-
-            // Check that the response is correct
-            if (authResponse[0] != 0x01 || authResponse[1] != 0x00) {
-                MessageBoxA(NULL, "Proxy server rejected SOCKS5 authentication.", "Error", MB_ICONERROR);
-                delete[] authDetails;
-                goto END;
-            }
-        }
-
-        // Convert the ip and port to network byte order
-        char ip[4];
-        if (inet_pton(AF_INET, originalIp, ip) == 0) {
-            MessageBoxA(NULL, "Could not convert original IP to network byte order.", "Error", MB_ICONERROR);
-            delete[] authDetails;
-            goto END;
-        }
-        u_short port = htons(static_cast<u_short>(originalPort));
-
-
-        // Create the connect request to let the proxy server know the target server
-        char socks5ConnectRequest[10];
-
-        socks5ConnectRequest[0] = 0x05; // SOCKS5 version
-        socks5ConnectRequest[1] = 0x01; // CMD 0x01 to estabilish a TCP/IP stream connection
-        socks5ConnectRequest[2] = 0x00; // Reserved, must be 0
-        socks5ConnectRequest[3] = 0x01; // Type of address, IPv4
-        memcpy(&socks5ConnectRequest[4], &ip, 4); // IP address in network byte order
-        memcpy(&socks5ConnectRequest[8], &port, 2); // Port in network byte order
-
-        // Send the SOCKS5 connection request
-        if (send(proxySocket, socks5ConnectRequest, 10, 0) == SOCKET_ERROR) {
-            MessageBoxA(NULL, "Failed to send connect request to the proxy server.", "Error", MB_ICONERROR);
-            delete[] authDetails;
-            goto END;
-        }
-
-        // Receive the response
-        char connectResponse[10];
-        bytesRead = recv(proxySocket, connectResponse, 10, 0);
-
-        if (bytesRead <= 0) {
-            MessageBoxA(NULL, "Failed to receive connect response from the proxy server.", "Error", MB_ICONERROR);
-            delete[] authDetails;
-            goto END;
-        }
-
-        // Check if the response is correct
-        if (connectResponse[1] != 0x00) {
-            MessageBoxA(NULL, "Proxy server rejected SOCKS5 connect request.", "Error", MB_ICONERROR);
-        }
-
-        delete[] authDetails;
     }
 
-END:
     __asm {
         // Epilogue
         mov esp, ebp
